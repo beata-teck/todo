@@ -20,6 +20,11 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog"
+import { z } from "zod"
+
+const todoSchema = z.object({
+  text: z.string().min(3, "Task must be at least 3 characters").max(100, "Task is too long"),
+})
 
 type Todo = {
   id: number
@@ -31,6 +36,7 @@ export default function Home() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [input, setInput] = useState("")
   const [filter, setFilter] = useState("all")
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const saved = localStorage.getItem("todos")
@@ -44,14 +50,19 @@ export default function Home() {
   }, [todos])
 
   function addTodo() {
-    if (input === "") return
+    const result = todoSchema.safeParse({ text: input })
 
+    if (!result.success) {
+      setError(result.error.issues[0].message)
+      return
+    }
+
+    setError(null)
     const newTodo = {
       id: Date.now(),
       text: input,
       done: false,
     }
-
     setTodos([...todos, newTodo])
     setInput("")
   }
@@ -90,17 +101,25 @@ export default function Home() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Add a new task..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addTodo()
-              }}
-              className="flex-1"
-            />
-            <Button onClick={addTodo}>Add</Button>
+          <div className="flex flex-col gap-1">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Add a new task..."
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  setError(null)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addTodo()
+                }}
+                className="flex-1"
+              />
+              <Button onClick={addTodo}>Add</Button>
+            </div>
+            {error && (
+              <p className="text-red-500 text-xs">{error}</p>
+            )}
           </div>
 
           <Tabs value={filter} onValueChange={setFilter}>
@@ -142,26 +161,26 @@ export default function Home() {
                 </div>
 
                 <AlertDialog>
-  <AlertDialogTrigger asChild>
-    <Button variant="ghost" size="icon">
-      <Trash2 className="w-4 h-4 text-red-500" />
-    </Button>
-  </AlertDialogTrigger>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Delete this task?</AlertDialogTitle>
-      <AlertDialogDescription>
-        This can't be undone.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>Cancel</AlertDialogCancel>
-      <AlertDialogAction onClick={() => deleteTodo(todo.id)}>
-        Delete
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This can't be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => deleteTodo(todo.id)}>
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             ))}
           </div>
