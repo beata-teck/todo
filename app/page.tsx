@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { Trash2 } from "lucide-react"
 import {
   AlertDialog,
@@ -25,7 +26,7 @@ import { z } from "zod"
 const todoSchema = z.object({
   text: z.string().min(3, "Task must be at least 3 characters").max(100, "Task is too long"),
 })
-const [loading, setLoading] = useState(true)
+
 type Todo = {
   id: number
   text: string
@@ -37,21 +38,20 @@ export default function Home() {
   const [input, setInput] = useState("")
   const [filter, setFilter] = useState("all")
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [showCompleted, setShowCompleted] = useState(true)
 
   useEffect(() => {
     const saved = localStorage.getItem("todos")
     if (saved) {
       setTodos(JSON.parse(saved))
     }
+    setLoading(false)
   }, [])
 
   useEffect(() => {
-  const saved = localStorage.getItem("todos")
-  if (saved) {
-    setTodos(JSON.parse(saved))
-  }
-  setLoading(false)
-}, [])
+    localStorage.setItem("todos", JSON.stringify(todos))
+  }, [todos])
 
   function addTodo() {
     const result = todoSchema.safeParse({ text: input })
@@ -92,17 +92,23 @@ export default function Home() {
     filteredTodos = todos.filter((t) => t.done)
   }
 
+  if (!showCompleted) {
+    filteredTodos = filteredTodos.filter((t) => !t.done)
+  }
+
   const activeCount = todos.filter((t) => !t.done).length
-if (loading) {
-  return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin" />
-        <p className="text-sm text-red-500">Loading your tasks...</p>
-      </div>
-    </main>
-  )
-}
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin" />
+          <p className="text-sm text-red-500">Loading your tasks...</p>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 flex justify-center p-4 sm:p-8 sm:items-center">
       <Card className="w-full max-w-md">
@@ -135,13 +141,22 @@ if (loading) {
             )}
           </div>
 
-          <Tabs value={filter} onValueChange={setFilter}>
-            <TabsList className="w-full grid grid-cols-3">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex items-center justify-between">
+            <Tabs value={filter} onValueChange={setFilter}>
+              <TabsList className="grid grid-cols-3">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="active">Active</TabsTrigger>
+                <TabsTrigger value="completed">Completed</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Done</span>
+              <Switch
+                checked={showCompleted}
+                onCheckedChange={setShowCompleted}
+              />
+            </div>
+          </div>
 
           <Separator />
 
