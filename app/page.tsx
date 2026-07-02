@@ -178,15 +178,32 @@ export default function Home() {
           {selected.length > 0 && (
             <div className="flex items-center justify-between bg-red-50 border border-red-100 rounded-lg px-3 py-2">
               <span className="text-xs text-red-600">{selected.length} selected</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-red-600 hover:text-red-700 hover:bg-red-100 h-7 px-2 text-xs"
-                onClick={deleteSelected}
-              >
-                <Trash2 className="w-3 h-3 mr-1" />
-                Delete selected
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-100 h-7 px-2 text-xs"
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Delete selected
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete {selected.length} tasks?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This can't be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={deleteSelected}>
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           )}
 
@@ -225,31 +242,26 @@ export default function Home() {
                 </div>
 
                 <AlertDialog>
-  <AlertDialogTrigger asChild>
-    <Button
-      variant="ghost"
-      size="sm"
-      className="text-red-600 hover:text-red-700 hover:bg-red-100 h-7 px-2 text-xs"
-    >
-      <Trash2 className="w-3 h-3 mr-1" />
-      Delete selected
-    </Button>
-  </AlertDialogTrigger>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Delete {selected.length} tasks?</AlertDialogTitle>
-      <AlertDialogDescription>
-        This can't be undone.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>Cancel</AlertDialogCancel>
-      <AlertDialogAction onClick={deleteSelected}>
-        Delete
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This can't be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => deleteTodo(todo.id)}>
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             ))}
           </div>
