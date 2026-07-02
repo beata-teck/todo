@@ -40,6 +40,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCompleted, setShowCompleted] = useState(true)
+  const [selected, setSelected] = useState<number[]>([])
 
   useEffect(() => {
     const saved = localStorage.getItem("todos")
@@ -83,6 +84,20 @@ export default function Home() {
 
   function deleteTodo(id: number) {
     setTodos(todos.filter((t) => t.id !== id))
+    setSelected(selected.filter((s) => s !== id))
+  }
+
+  function toggleSelect(id: number) {
+    if (selected.includes(id)) {
+      setSelected(selected.filter((s) => s !== id))
+    } else {
+      setSelected([...selected, id])
+    }
+  }
+
+  function deleteSelected() {
+    setTodos(todos.filter((t) => !selected.includes(t.id)))
+    setSelected([])
   }
 
   let filteredTodos = todos
@@ -160,6 +175,21 @@ export default function Home() {
 
           <Separator />
 
+          {selected.length > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              <span className="text-xs text-red-600">{selected.length} selected</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-100 h-7 px-2 text-xs"
+                onClick={deleteSelected}
+              >
+                <Trash2 className="w-3 h-3 mr-1" />
+                Delete selected
+              </Button>
+            </div>
+          )}
+
           <div className="space-y-2">
             {filteredTodos.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-6">
@@ -170,9 +200,15 @@ export default function Home() {
             {filteredTodos.map((todo) => (
               <div
                 key={todo.id}
-                className="flex items-center justify-between gap-2 p-2 rounded-lg border"
+                className={`flex items-center justify-between gap-2 p-2 rounded-lg border transition-colors ${
+                  selected.includes(todo.id) ? "bg-red-50 border-red-200" : ""
+                }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
+                  <Checkbox
+                    checked={selected.includes(todo.id)}
+                    onCheckedChange={() => toggleSelect(todo.id)}
+                  />
                   <Checkbox
                     checked={todo.done}
                     onCheckedChange={() => toggleTodo(todo.id)}
