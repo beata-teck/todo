@@ -41,7 +41,7 @@ type Todo = {
   done: boolean
 }
 
-const ITEMS_PER_PAGE = 5
+const ITEMS_PER_PAGE = 10
 
 export default function Home() {
   const [todos, setTodos] = useState<Todo[]>([])
