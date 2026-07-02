@@ -25,7 +25,7 @@ import { z } from "zod"
 const todoSchema = z.object({
   text: z.string().min(3, "Task must be at least 3 characters").max(100, "Task is too long"),
 })
-
+const [loading, setLoading] = useState(true)
 type Todo = {
   id: number
   text: string
@@ -46,8 +46,12 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    localStorage.setItem("todos", JSON.stringify(todos))
-  }, [todos])
+  const saved = localStorage.getItem("todos")
+  if (saved) {
+    setTodos(JSON.parse(saved))
+  }
+  setLoading(false)
+}, [])
 
   function addTodo() {
     const result = todoSchema.safeParse({ text: input })
@@ -89,7 +93,16 @@ export default function Home() {
   }
 
   const activeCount = todos.filter((t) => !t.done).length
-
+if (loading) {
+  return (
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin" />
+        <p className="text-sm text-red-500">Loading your tasks...</p>
+      </div>
+    </main>
+  )
+}
   return (
     <main className="min-h-screen bg-gray-50 flex justify-center p-4 sm:p-8 sm:items-center">
       <Card className="w-full max-w-md">
