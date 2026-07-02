@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { Trash2 } from "lucide-react"
+import { Trash2, Pencil } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -21,6 +21,13 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { z } from "zod"
 
 const todoSchema = z.object({
@@ -41,6 +48,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [showCompleted, setShowCompleted] = useState(true)
   const [selected, setSelected] = useState<number[]>([])
+  const [editTodo, setEditTodo] = useState<Todo | null>(null)
+  const [editText, setEditText] = useState("")
 
   useEffect(() => {
     const saved = localStorage.getItem("todos")
@@ -98,6 +107,20 @@ export default function Home() {
   function deleteSelected() {
     setTodos(todos.filter((t) => !selected.includes(t.id)))
     setSelected([])
+  }
+
+  function openEdit(todo: Todo) {
+    setEditTodo(todo)
+    setEditText(todo.text)
+  }
+
+  function saveEdit() {
+    if (!editTodo) return
+    const result = todoSchema.safeParse({ text: editText })
+    if (!result.success) return
+    setTodos(todos.map((t) => t.id === editTodo.id ? { ...t, text: editText } : t))
+    setEditTodo(null)
+    setEditText("")
   }
 
   let filteredTodos = todos
@@ -241,32 +264,60 @@ export default function Home() {
                   </span>
                 </div>
 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete this task?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This can't be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => deleteTodo(todo.id)}>
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openEdit(todo)}
+                  >
+                    <Pencil className="w-4 h-4 text-gray-400" />
+                  </Button>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This can't be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteTodo(todo.id)}>
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!editTodo} onOpenChange={(open) => { if (!open) setEditTodo(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit task</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") saveEdit() }}
+            placeholder="Edit your task..."
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTodo(null)}>Cancel</Button>
+            <Button onClick={saveEdit}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }
