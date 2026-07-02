@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { Trash2, Pencil } from "lucide-react"
+
+import { Trash2, Pencil, ChevronLeft, ChevronRight } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -40,6 +41,9 @@ type Todo = {
   done: boolean
 }
 
+
+const ITEMS_PER_PAGE = 5
+
 export default function Home() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [input, setInput] = useState("")
@@ -50,6 +54,8 @@ export default function Home() {
   const [selected, setSelected] = useState<number[]>([])
   const [editTodo, setEditTodo] = useState<Todo | null>(null)
   const [editText, setEditText] = useState("")
+  
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     const saved = localStorage.getItem("todos")
@@ -79,6 +85,8 @@ export default function Home() {
     }
     setTodos([...todos, newTodo])
     setInput("")
+    // Optional: jump back to page 1 when adding a new task
+    setCurrentPage(1)
   }
 
   function toggleTodo(id: number) {
@@ -123,6 +131,7 @@ export default function Home() {
     setEditText("")
   }
 
+  // Filtering Logic
   let filteredTodos = todos
   if (filter === "active") {
     filteredTodos = todos.filter((t) => !t.done)
@@ -135,6 +144,20 @@ export default function Home() {
   }
 
   const activeCount = todos.filter((t) => !t.done).length
+
+  const totalPages = Math.ceil(filteredTodos.length / ITEMS_PER_PAGE) || 1
+  
+ 
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [filteredTodos.length, currentPage, totalPages])
+
+  const paginatedTodos = filteredTodos.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
 
   if (loading) {
     return (
@@ -180,7 +203,10 @@ export default function Home() {
           </div>
 
           <div className="flex items-center justify-between">
-            <Tabs value={filter} onValueChange={setFilter}>
+            <Tabs value={filter} onValueChange={(val) => {
+              setFilter(val)
+              setCurrentPage(1) // Reset to first page on filter change
+            }}>
               <TabsList className="grid grid-cols-3">
                 <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="active">Active</TabsTrigger>
@@ -191,7 +217,10 @@ export default function Home() {
               <span className="text-xs text-gray-500">Done</span>
               <Switch
                 checked={showCompleted}
-                onCheckedChange={setShowCompleted}
+                onCheckedChange={(checked) => {
+                  setShowCompleted(checked)
+                  setCurrentPage(1) // Reset to first page on switch toggle
+                }}
               />
             </div>
           </div>
@@ -230,14 +259,15 @@ export default function Home() {
             </div>
           )}
 
-          <div className="space-y-2">
+          <div className="space-y-2 min-h-[250px]"> {/* Added min-height to prevent UI jumping */}
             {filteredTodos.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-6">
                 No tasks here.
               </p>
             )}
 
-            {filteredTodos.map((todo) => (
+            {/* Render paginatedTodos instead of filteredTodos */}
+            {paginatedTodos.map((todo) => (
               <div
                 key={todo.id}
                 className={`flex items-center justify-between gap-2 p-2 rounded-lg border transition-colors ${
@@ -298,6 +328,33 @@ export default function Home() {
               </div>
             ))}
           </div>
+
+          {/* Pagination Controls */}
+          {filteredTodos.length > ITEMS_PER_PAGE && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </Button>
+              <span className="text-sm text-gray-500">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
