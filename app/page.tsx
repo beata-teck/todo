@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useTheme } from "next-themes"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -9,8 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-
-import { Trash2, Pencil, ChevronLeft, ChevronRight } from "lucide-react"
+import { Trash2, Pencil, ChevronLeft, ChevronRight, Moon, Sun } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -41,7 +41,6 @@ type Todo = {
   done: boolean
 }
 
-
 const ITEMS_PER_PAGE = 5
 
 export default function Home() {
@@ -54,8 +53,16 @@ export default function Home() {
   const [selected, setSelected] = useState<number[]>([])
   const [editTodo, setEditTodo] = useState<Todo | null>(null)
   const [editText, setEditText] = useState("")
-  
   const [currentPage, setCurrentPage] = useState(1)
+  
+  // Theme state
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  // Avoid structural hydration mismatches by ensuring the component mounted safely
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const saved = localStorage.getItem("todos")
@@ -85,7 +92,6 @@ export default function Home() {
     }
     setTodos([...todos, newTodo])
     setInput("")
-    // Optional: jump back to page 1 when adding a new task
     setCurrentPage(1)
   }
 
@@ -131,7 +137,6 @@ export default function Home() {
     setEditText("")
   }
 
-  // Filtering Logic
   let filteredTodos = todos
   if (filter === "active") {
     filteredTodos = todos.filter((t) => !t.done)
@@ -144,10 +149,8 @@ export default function Home() {
   }
 
   const activeCount = todos.filter((t) => !t.done).length
-
   const totalPages = Math.ceil(filteredTodos.length / ITEMS_PER_PAGE) || 1
   
- 
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages)
@@ -161,22 +164,41 @@ export default function Home() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <main className="min-h-screen bg-muted/40 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin" />
-          <p className="text-sm text-red-500">Loading your tasks...</p>
+          <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading your tasks...</p>
         </div>
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 flex justify-center p-4 sm:p-8 sm:items-center">
-      <Card className="w-full max-w-md">
+    <main className="min-h-screen bg-muted/40 text-foreground flex justify-center p-4 sm:p-8 sm:items-center transition-colors duration-200">
+      <Card className="w-full max-w-md bg-card border-border">
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-xl">
-            My Todos
-            <Badge variant="secondary">{activeCount} left</Badge>
+            <div className="flex items-center gap-2">
+              My Todos
+              <Badge variant="secondary">{activeCount} left</Badge>
+            </div>
+            
+            {/* Inline Theme Toggle Trigger */}
+            {mounted && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4 text-amber-500" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+                <span className="sr-only">Toggle theme</span>
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
 
@@ -198,14 +220,14 @@ export default function Home() {
               <Button onClick={addTodo}>Add</Button>
             </div>
             {error && (
-              <p className="text-red-500 text-xs">{error}</p>
+              <p className="text-destructive text-xs font-medium">{error}</p>
             )}
           </div>
 
           <div className="flex items-center justify-between">
             <Tabs value={filter} onValueChange={(val) => {
               setFilter(val)
-              setCurrentPage(1) // Reset to first page on filter change
+              setCurrentPage(1) 
             }}>
               <TabsList className="grid grid-cols-3">
                 <TabsTrigger value="all">All</TabsTrigger>
@@ -214,28 +236,28 @@ export default function Home() {
               </TabsList>
             </Tabs>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Done</span>
+              <span className="text-xs text-muted-foreground">Done</span>
               <Switch
                 checked={showCompleted}
                 onCheckedChange={(checked) => {
                   setShowCompleted(checked)
-                  setCurrentPage(1) // Reset to first page on switch toggle
+                  setCurrentPage(1)
                 }}
               />
             </div>
           </div>
 
-          <Separator />
+          <Separator className="bg-border" />
 
           {selected.length > 0 && (
-            <div className="flex items-center justify-between bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              <span className="text-xs text-red-600">{selected.length} selected</span>
+            <div className="flex items-center justify-between bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 transition-colors">
+              <span className="text-xs text-destructive font-medium">{selected.length} selected</span>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-red-600 hover:text-red-700 hover:bg-red-100 h-7 px-2 text-xs"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/15 h-7 px-2 text-xs"
                   >
                     <Trash2 className="w-3 h-3 mr-1" />
                     Delete selected
@@ -259,19 +281,20 @@ export default function Home() {
             </div>
           )}
 
-          <div className="space-y-2 min-h-[250px]"> {/* Added min-height to prevent UI jumping */}
+          <div className="space-y-2 min-h-[250px]">
             {filteredTodos.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-6">
+              <p className="text-sm text-muted-foreground text-center py-6">
                 No tasks here.
               </p>
             )}
 
-            {/* Render paginatedTodos instead of filteredTodos */}
             {paginatedTodos.map((todo) => (
               <div
                 key={todo.id}
                 className={`flex items-center justify-between gap-2 p-2 rounded-lg border transition-colors ${
-                  selected.includes(todo.id) ? "bg-red-50 border-red-200" : ""
+                  selected.includes(todo.id) 
+                    ? "bg-destructive/10 border-destructive/30" 
+                    : "border-border bg-card hover:bg-muted/30"
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
@@ -286,8 +309,8 @@ export default function Home() {
                   <span
                     className={
                       todo.done
-                        ? "text-sm truncate line-through text-gray-400"
-                        : "text-sm truncate"
+                        ? "text-sm truncate line-through text-muted-foreground"
+                        : "text-sm truncate text-foreground"
                     }
                   >
                     {todo.text}
@@ -299,14 +322,15 @@ export default function Home() {
                     variant="ghost"
                     size="icon"
                     onClick={() => openEdit(todo)}
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   >
-                    <Pencil className="w-4 h-4 text-gray-400" />
+                    <Pencil className="w-4 h-4" />
                   </Button>
 
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <Trash2 className="w-4 h-4 text-red-500" />
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
@@ -329,9 +353,8 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Pagination Controls */}
           {filteredTodos.length > ITEMS_PER_PAGE && (
-            <div className="flex items-center justify-between pt-4 border-t">
+            <div className="flex items-center justify-between pt-4 border-t border-border">
               <Button
                 variant="outline"
                 size="sm"
@@ -341,7 +364,7 @@ export default function Home() {
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Previous
               </Button>
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
               </span>
               <Button
