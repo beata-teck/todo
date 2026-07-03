@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -10,7 +14,16 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { Trash2, Pencil, ChevronLeft, ChevronRight, Moon, Sun } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Trash2,
+  Pencil,
+  ChevronLeft,
+  ChevronRight,
+  Moon,
+  Sun,
+  Search,
+} from "lucide-react"
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -29,15 +42,34 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { z } from "zod"
+
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form"
 
 const todoSchema = z.object({
-  text: z.string().min(3, "Task must be at least 3 characters").max(100, "Task is too long"),
+  title: z
+    .string()
+    .min(3, "Title must be at least 3 characters")
+    .max(100, "Title is too long"),
+  description: z
+    .string()
+    .max(500, "Description is too long")
+    .optional()
+    .or(z.literal("")),
 })
+
+type TodoFormValues = z.infer<typeof todoSchema>
 
 type Todo = {
   id: number
-  text: string
+  title: string
+  description?: string
   done: boolean
 }
 
@@ -45,112 +77,142 @@ const ITEMS_PER_PAGE = 10
 
 export default function Home() {
   const [todos, setTodos] = useState<Todo[]>([])
-  const [input, setInput] = useState("")
   const [filter, setFilter] = useState("all")
-  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCompleted, setShowCompleted] = useState(true)
   const [selected, setSelected] = useState<number[]>([])
   const [editTodo, setEditTodo] = useState<Todo | null>(null)
-  const [editText, setEditText] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  
-  // Theme state
+  const [search, setSearch] = useState("")
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
-  // Avoid structural hydration mismatches by ensuring the component mounted safely
+  // Create form (add task)
+  const createForm = useForm<TodoFormValues>({
+    // cast to any to avoid Zod version mismatch between resolver and schema
+    resolver: zodResolver(todoSchema as any),
+    defaultValues: {
+      title: "",
+      description: "",
+    },
+  })
+
+  // Edit form (update task)
+  const editForm = useForm<TodoFormValues>({
+    // cast to any to avoid Zod version mismatch between resolver and schema
+    resolver: zodResolver(todoSchema as any),
+    defaultValues: {
+      title: "",
+      description: "",
+    },
+  })
+
+  // Avoid hydration mismatch for theme and client-only stuff
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  // Load todos from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("todos")
+    const saved = localStorage.getItem("todos_v2")
     if (saved) {
-      setTodos(JSON.parse(saved))
+      try {
+        const parsed: Todo[] = JSON.parse(saved)
+        setTodos(parsed)
+      } catch {
+        // ignore parse errors
+      }
     }
     setLoading(false)
   }, [])
 
+  // Persist todos to localStorage
   useEffect(() => {
-    localStorage.setItem("todos", JSON.stringify(todos))
+    localStorage.setItem("todos_v2", JSON.stringify(todos))
   }, [todos])
 
-  function addTodo() {
-    const result = todoSchema.safeParse({ text: input })
-
-    if (!result.success) {
-      setError(result.error.issues[0].message)
-      return
-    }
-
-    setError(null)
-    const newTodo = {
+  function onCreateSubmit(values: TodoFormValues) {
+    const newTodo: Todo = {
       id: Date.now(),
-      text: input,
+      title: values.title,
+      description: values.description || "",
       done: false,
     }
-    setTodos([...todos, newTodo])
-    setInput("")
+    setTodos((prev) => [newTodo, ...prev])
     setCurrentPage(1)
+    createForm.reset()
   }
 
   function toggleTodo(id: number) {
-    const updated = todos.map((t) => {
-      if (t.id === id) {
-        return { ...t, done: !t.done }
-      }
-      return t
-    })
-    setTodos(updated)
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
+    )
   }
 
   function deleteTodo(id: number) {
-    setTodos(todos.filter((t) => t.id !== id))
-    setSelected(selected.filter((s) => s !== id))
+    setTodos((prev) => prev.filter((t) => t.id !== id))
+    setSelected((prev) => prev.filter((s) => s !== id))
   }
 
   function toggleSelect(id: number) {
-    if (selected.includes(id)) {
-      setSelected(selected.filter((s) => s !== id))
-    } else {
-      setSelected([...selected, id])
-    }
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    )
   }
 
   function deleteSelected() {
-    setTodos(todos.filter((t) => !selected.includes(t.id)))
+    setTodos((prev) => prev.filter((t) => !selected.includes(t.id)))
     setSelected([])
   }
 
   function openEdit(todo: Todo) {
     setEditTodo(todo)
-    setEditText(todo.text)
+    // set default values into the edit form
+    editForm.reset({
+      title: todo.title,
+      description: todo.description || "",
+    })
   }
 
-  function saveEdit() {
+  function onEditSubmit(values: TodoFormValues) {
     if (!editTodo) return
-    const result = todoSchema.safeParse({ text: editText })
-    if (!result.success) return
-    setTodos(todos.map((t) => t.id === editTodo.id ? { ...t, text: editText } : t))
+    setTodos((prev) =>
+      prev.map((t) =>
+        t.id === editTodo.id
+          ? {
+              ...t,
+              title: values.title,
+              description: values.description || "",
+            }
+          : t
+      )
+    )
     setEditTodo(null)
-    setEditText("")
   }
 
+  // Filtering and search
   let filteredTodos = todos
+
   if (filter === "active") {
-    filteredTodos = todos.filter((t) => !t.done)
+    filteredTodos = filteredTodos.filter((t) => !t.done)
   } else if (filter === "completed") {
-    filteredTodos = todos.filter((t) => t.done)
+    filteredTodos = filteredTodos.filter((t) => t.done)
   }
 
   if (!showCompleted) {
     filteredTodos = filteredTodos.filter((t) => !t.done)
   }
 
+  if (search.trim()) {
+    const query = search.toLowerCase()
+    filteredTodos = filteredTodos.filter((t) =>
+      `${t.title} ${t.description ?? ""}`.toLowerCase().includes(query)
+    )
+  }
+
   const activeCount = todos.filter((t) => !t.done).length
   const totalPages = Math.ceil(filteredTodos.length / ITEMS_PER_PAGE) || 1
-  
+
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages)
@@ -175,20 +237,21 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-muted/40 text-foreground flex justify-center p-4 sm:p-8 sm:items-center transition-colors duration-200">
-      <Card className="w-full max-w-md bg-card border-border">
+      <Card className="w-full max-w-2xl bg-card border-border">
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-xl">
             <div className="flex items-center gap-2">
               My Todos
               <Badge variant="secondary">{activeCount} left</Badge>
             </div>
-            
-            {/* Inline Theme Toggle Trigger */}
+
             {mounted && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                onClick={() =>
+                  setTheme(theme === "dark" ? "light" : "dark")
+                }
                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
               >
                 {theme === "dark" ? (
@@ -203,55 +266,108 @@ export default function Home() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="flex flex-col gap-1">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add a new task..."
-                value={input}
-                onChange={(e) => {
-                  setInput(e.target.value)
-                  setError(null)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") addTodo()
-                }}
-                className="flex-1"
+          {/* Create task form */}
+          <Form {...createForm}>
+            <form
+              onSubmit={createForm.handleSubmit(onCreateSubmit)}
+              className="space-y-3"
+            >
+              <FormField
+                control={createForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Task title</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g. Finish React assignment"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              <Button onClick={addTodo}>Add</Button>
-            </div>
-            {error && (
-              <p className="text-destructive text-xs font-medium">{error}</p>
-            )}
-          </div>
 
-          <div className="flex items-center justify-between">
-            <Tabs value={filter} onValueChange={(val) => {
-              setFilter(val)
-              setCurrentPage(1) 
-            }}>
-              <TabsList className="grid grid-cols-3">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="active">Active</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Done</span>
-              <Switch
-                checked={showCompleted}
-                onCheckedChange={(checked) => {
-                  setShowCompleted(checked)
+              <FormField
+                control={createForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Add more details about the task..."
+                        rows={3}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end">
+                <Button type="submit">Add task</Button>
+              </div>
+            </form>
+          </Form>
+
+          <Separator className="bg-border" />
+
+          {/* Search + filters */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-8"
+                  placeholder="Search tasks..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value)
+                    setCurrentPage(1)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <Tabs
+                value={filter}
+                onValueChange={(val) => {
+                  setFilter(val)
                   setCurrentPage(1)
                 }}
-              />
+              >
+                <TabsList className="grid grid-cols-3">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="active">Active</TabsTrigger>
+                  <TabsTrigger value="completed">Completed</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Show done</span>
+                <Switch
+                  checked={showCompleted}
+                  onCheckedChange={(checked) => {
+                    setShowCompleted(checked)
+                    setCurrentPage(1)
+                  }}
+                />
+              </div>
             </div>
           </div>
 
           <Separator className="bg-border" />
 
+          {/* Bulk delete banner */}
           {selected.length > 0 && (
             <div className="flex items-center justify-between bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 transition-colors">
-              <span className="text-xs text-destructive font-medium">{selected.length} selected</span>
+              <span className="text-xs text-destructive font-medium">
+                {selected.length} selected
+              </span>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -265,9 +381,11 @@ export default function Home() {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete {selected.length} tasks?</AlertDialogTitle>
+                    <AlertDialogTitle>
+                      Delete {selected.length} tasks?
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                      This can't be undone.
+                      This can&apos;t be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -281,6 +399,7 @@ export default function Home() {
             </div>
           )}
 
+          {/* Todo list */}
           <div className="space-y-2 min-h-[250px]">
             {filteredTodos.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-6">
@@ -291,13 +410,13 @@ export default function Home() {
             {paginatedTodos.map((todo) => (
               <div
                 key={todo.id}
-                className={`flex items-center justify-between gap-2 p-2 rounded-lg border transition-colors ${
-                  selected.includes(todo.id) 
-                    ? "bg-destructive/10 border-destructive/30" 
+                className={`flex items-start justify-between gap-2 p-2 rounded-lg border transition-colors ${
+                  selected.includes(todo.id)
+                    ? "bg-destructive/10 border-destructive/30"
                     : "border-border bg-card hover:bg-muted/30"
                 }`}
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-start gap-2 min-w-0">
                   <Checkbox
                     checked={selected.includes(todo.id)}
                     onCheckedChange={() => toggleSelect(todo.id)}
@@ -306,15 +425,22 @@ export default function Home() {
                     checked={todo.done}
                     onCheckedChange={() => toggleTodo(todo.id)}
                   />
-                  <span
-                    className={
-                      todo.done
-                        ? "text-sm truncate line-through text-muted-foreground"
-                        : "text-sm truncate text-foreground"
-                    }
-                  >
-                    {todo.text}
-                  </span>
+                  <div className="flex flex-col min-w-0">
+                    <span
+                      className={
+                        todo.done
+                          ? "text-sm font-medium truncate line-through text-muted-foreground"
+                          : "text-sm font-medium truncate text-foreground"
+                      }
+                    >
+                      {todo.title}
+                    </span>
+                    {todo.description && (
+                      <span className="text-xs text-muted-foreground line-clamp-2">
+                        {todo.description}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -329,7 +455,11 @@ export default function Home() {
 
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </AlertDialogTrigger>
@@ -337,7 +467,7 @@ export default function Home() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete this task?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This can't be undone.
+                          This can&apos;t be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -353,6 +483,7 @@ export default function Home() {
             ))}
           </div>
 
+          {/* Pagination */}
           {filteredTodos.length > ITEMS_PER_PAGE && (
             <div className="flex items-center justify-between pt-4 border-t border-border">
               <Button
@@ -370,7 +501,9 @@ export default function Home() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
                 disabled={currentPage === totalPages}
               >
                 Next
@@ -381,21 +514,69 @@ export default function Home() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!editTodo} onOpenChange={(open) => { if (!open) setEditTodo(null) }}>
+      {/* Edit dialog with React Hook Form */}
+      <Dialog
+        open={!!editTodo}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditTodo(null)
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit task</DialogTitle>
           </DialogHeader>
-          <Input
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") saveEdit() }}
-            placeholder="Edit your task..."
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditTodo(null)}>Cancel</Button>
-            <Button onClick={saveEdit}>Save</Button>
-          </DialogFooter>
+
+          <Form {...editForm}>
+            <form
+              onSubmit={editForm.handleSubmit(onEditSubmit)}
+              className="space-y-3"
+            >
+              <FormField
+                control={editForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Task title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Edit task title..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Edit task description..."
+                        rows={3}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditTodo(null)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">Save</Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </main>
