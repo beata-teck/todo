@@ -50,7 +50,7 @@ export default function TodoForm({ onAdd }: Props) {
             <FormItem>
               <FormLabel>Task title</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. Finish React assignment" {...field} />
+                <Input placeholder="e.g. check react hook form" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
